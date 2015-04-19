@@ -30,10 +30,90 @@ int intervaloFotoEnSegundos = intervaloFotosEnMinutos * SEGUNDOS_POR_MINUTO;
 int segundosPasadosDesdeUltimaFoto = 0;
 boolean esMomentoDeSacarFoto = false;
 
+
+///////////////////////// SET UP ////////////////////////////
 void setup() {
         Serial.begin(9600);
+ 
+        setupTimers();       
+
+        setupTinyRtc();
+
+	pinMode(LEDPIN, OUTPUT); // led de prueba  
+}
+/////////////////////// FIN SET UP /////////////////////////
+
+///////////////////// LOOP PRINCIPAL ///////////////////////
+void loop()
+{
+  if (esMomentoDeSacarFoto == true) {
+    sacarFoto();
+    // ahora seteamos en false ya que acabamos de sacar foto y no tenemos que sacar otra hasta el proximo intervalo
+    esMomentoDeSacarFoto = false;
+  }
+    
+}
+/////////////////// FIN LOOP PRINCIPAL ////////////////////
+
+
+/** 
+  * Interrupcion invocada por cada segundo.
+  * Lleva la cuenta de la cantidad de segundos que pasaron desde la ultima foto que se saco.  Si es momento de sacar una nueva foto, 
+  * entonces levanta flag de sacar foto, permitiendo al loop principal sacar la foto.
+  * Mantener esta interrupcion lo mas 'rapida' posible dado que mientras se encuentra en esta interrupcion, ninguna otra interrupcion puede ser manejada.
+**/
+ISR(TIMER1_COMPA_vect) {
+    segundosPasadosDesdeUltimaFoto++;
+    if (segundosPasadosDesdeUltimaFoto == intervaloFotoEnSegundos) {
+        Serial.print("Momento de sacar foto ");
+        esMomentoDeSacarFoto = true;
+        segundosPasadosDesdeUltimaFoto = 0;
+    }  
+}
+//-------------------------------------------
+//-------------------------------------------
+void sacarFoto() {
+//   digitalWrite(LEDPIN, !digitalRead(LEDPIN)); 
+  imprimirTiempo();
   
-        // ---------- Setup de los Timers. NO CAMBIAR -------------
+  prenderCamara();
+  digitalWrite (FOTO , LOW);
+  delay (DURACION_PULSO);
+  digitalWrite (FOTO , HIGH);   
+  ponerEnStandByCamara();
+  
+  Serial.println("Foto tomada");
+}
+//-------------------------------------------
+void prenderCamara() {
+    digitalWrite (PRENDER , LOW);  // Prende la camara
+    delay (DELAY_ENCENDIDO); 
+}
+//-------------------------------------------
+void ponerEnStandByCamara() {
+    delay (LIBERAR_PRENDER);
+    digitalWrite (PRENDER , HIGH); // Apaga la camara
+} 
+//-------------------------------------------
+void imprimirTiempo() {
+    RTC.getTime();
+    
+    String tiempo = ESPACIO;
+    tiempo = tiempo + RTC.hour, DEC;
+    tiempo = tiempo + ESPACIO;
+    tiempo = tiempo + RTC.minute, DEC;
+    tiempo = tiempo + ESPACIO;
+    tiempo = tiempo + RTC.second, DEC;
+   
+    Serial.println(tiempo);
+}
+//-------------------------------------------
+//-------------------------------------------
+// FUNCIONES DE SET UP
+//-------------------------------------------
+
+// ---------- Setup de los Timers. NO CAMBIAR -------------
+void setupTimers() {
 	// initialize Timer1
 	cli();			// disable global interrupts
 	TCCR1A = 0;		// set entire TCCR1A register to 0
@@ -49,10 +129,11 @@ void setup() {
 	// enable timer compare interrupt:
 	TIMSK1 |= (1 << OCIE1A);
 	// enable global interrupts:
-	sei();
-        // ------------ Fin Setup de los Timers -----------------
-        
-        // -------------Set up RTC -----------------------------
+	sei();  
+}  
+//-------------------------------------------
+// -------------Set up RTC ------------------
+void setupTinyRtc() {
         /*
          PLEASE NOTICE: WE HAVE MADE AN ADDRESS SHIFT FOR THE NV-RAM!!!
          NV-RAM ADDRESS 0x08 HAS TO ADDRESSED WITH ADDRESS 0x00=0
@@ -105,78 +186,6 @@ void setup() {
        
         Serial.println("Tiempo Actual");
        
-        uint8_t MESZ;        
-        // ------------- Fin Set up RTC ---------------------------
-
-
-
-        // Set up de camara
-	pinMode(LEDPIN, OUTPUT); // led de prueba  
-}
-
-
-///////////////////// LOOP PRINCIPAL ///////////////////////
-void loop()
-{
-  if (esMomentoDeSacarFoto == true) {
-    sacarFoto();
-    // ahora seteamos en false ya que acabamos de sacar foto y no tenemos que sacar otra hasta el proximo intervalo
-    esMomentoDeSacarFoto = false;
-  }
-    
-}
-/////////////////// FIN LOOP PRINCIPAL ////////////////////
-
-
-/** 
-  * Interrupcion invocada por cada segundo.
-  * Lleva la cuenta de la cantidad de segundos que paso desde la ultima foto que se saco.  Si es momento de sacar una nueva foto, 
-  * entonces levanta flag de sacar foto, permitiendo al loop principal sacar la foto.
-  * Manter esta interrupcion lo mas 'rapida' posible dado que mientras se encuentra en esta interrupcion, ninguna otra interrupcion puede ser manejada.
-**/
-ISR(TIMER1_COMPA_vect) {
-    segundosPasadosDesdeUltimaFoto++;
-    if (segundosPasadosDesdeUltimaFoto == intervaloFotoEnSegundos) {
-        Serial.print("Momento de sacar foto ");
-        esMomentoDeSacarFoto = true;
-        segundosPasadosDesdeUltimaFoto = 0;
-    }  
-}
-//-------------------------------------------
-//-------------------------------------------
-void sacarFoto() {
-//   digitalWrite(LEDPIN, !digitalRead(LEDPIN)); 
-  imprimirTiempo();
-  
-  prenderCamara();
-  digitalWrite (FOTO , LOW);
-  delay (DURACION_PULSO);
-  digitalWrite (FOTO , HIGH);   
-  ponerEnStandByCamara();
-  
-  Serial.println("Foto tomada");
-}
-//-------------------------------------------
-void prenderCamara() {
-    digitalWrite (PRENDER , LOW);  // Prende la camara
-    delay (DELAY_ENCENDIDO); 
-}
-//-------------------------------------------
-void ponerEnStandByCamara() {
-    delay (LIBERAR_PRENDER);
-    digitalWrite (PRENDER , HIGH); // Apaga la camara
-} 
-//-------------------------------------------
-void imprimirTiempo() {
-    RTC.getTime();
-    
-    String tiempo = ESPACIO;
-    tiempo = tiempo + RTC.hour, DEC;
-    tiempo = tiempo + ESPACIO;
-    tiempo = tiempo + RTC.minute, DEC;
-    tiempo = tiempo + ESPACIO;
-    tiempo = tiempo + RTC.second, DEC;
-   
-    Serial.println(tiempo);
+        uint8_t MESZ;          
 }
 //-------------------------------------------
