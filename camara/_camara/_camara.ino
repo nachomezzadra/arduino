@@ -6,7 +6,7 @@
 #include <DS1307new.h>
 
 #define LEDPIN 13
-#define SEGUNDOS_POR_MINUTO 1
+#define SEGUNDOS_POR_MINUTO 60
 const String ESPACIO = "   ";
 
 // RTC vars
@@ -24,7 +24,7 @@ const int DURACION_PULSO = 250;  // Setear en 500 ms
 
 
 //------------------------------
-int intervaloFotosEnMinutos = 5;
+int intervaloFotosEnMinutos = 15;
 //------------------------------
 int intervaloFotoEnSegundos = intervaloFotosEnMinutos * SEGUNDOS_POR_MINUTO;
 int segundosPasadosDesdeUltimaFoto = 0;
