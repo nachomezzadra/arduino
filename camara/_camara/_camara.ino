@@ -50,8 +50,7 @@ void loop()
     sacarFoto();
     // ahora seteamos en false ya que acabamos de sacar foto y no tenemos que sacar otra hasta el proximo intervalo
     esMomentoDeSacarFoto = false;
-  }
-    
+  } 
 }
 /////////////////// FIN LOOP PRINCIPAL ////////////////////
 
@@ -64,13 +63,27 @@ void loop()
 **/
 ISR(TIMER1_COMPA_vect) {
     segundosPasadosDesdeUltimaFoto++;
-    if (segundosPasadosDesdeUltimaFoto == intervaloFotoEnSegundos) {
+    if (debeSacarFoto(segundosPasadosDesdeUltimaFoto)) {
         Serial.print("Momento de sacar foto ");
         esMomentoDeSacarFoto = true;
         segundosPasadosDesdeUltimaFoto = 0;
     }  
 }
 //-------------------------------------------
+//-------------------------------------------
+/* 
+* Determina si debe sacar la foto en base a la cantidad de segundos pasados desde la ultima foto y 
+* si se encuentra dentro del intervalo para sacar foto.  De esta manera nos aseguramos que saque 
+* fotos siempre a la misma hora y no solamente cada XX segundos desde que inicia el Arduino.
+* Si el modulo da 0 queire decir que esta en los minutos exactos, por ende si en ese caso los 
+* segunods son menores al intervalo en segundos, quiere decir que acaba de iniciar el Arduino y 
+* debemos sacar una foto.
+*/
+boolean debeSacarFoto(int segundosPasadosDesdeUltimaFoto) {
+    int minutosEnHora = RTC.minute;
+    int modulo = minutosEnHora % intervaloFotosEnMinutos;
+    return (((segundosPasadosDesdeUltimaFoto == intervaloFotoEnSegundos) && (modulo == 0)) || ((modulo == 0) && (segundosPasadosDesdeUltimaFoto < intervaloFotoEnSegundos)));
+}
 //-------------------------------------------
 void sacarFoto() {
 //   digitalWrite(LEDPIN, !digitalRead(LEDPIN)); 
