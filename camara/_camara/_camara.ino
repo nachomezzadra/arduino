@@ -27,8 +27,8 @@ const int DURACION_PULSO = 250;  // Setear en 500 ms
 int intervaloFotosEnMinutos = 15;
 //------------------------------
 int intervaloFotoEnSegundos = intervaloFotosEnMinutos * SEGUNDOS_POR_MINUTO;
-int segundosPasadosDesdeUltimaFoto = 0;
-boolean esMomentoDeSacarFoto = false;
+volatile int segundosPasadosDesdeUltimaFoto = 0;
+volatile boolean esMomentoDeSacarFoto = false;
 
 
 ///////////////////////// SET UP ////////////////////////////
