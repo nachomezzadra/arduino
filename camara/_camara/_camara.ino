@@ -5,6 +5,8 @@
 #include <Wire.h> // For some strange reasons, Wire.h must be included here. Needed by DS1307new
 #include <DS1307new.h>
 
+#include <IRremote.h>
+
 #define LEDPIN 13
 #define SEGUNDOS_POR_MINUTO 60
 const String ESPACIO = "   ";
@@ -22,6 +24,13 @@ const int LIBERAR_PRENDER = 250;  // Setear en 500 ms
 const int DELAY_ENCENDIDO = 500; // Tiempo entre el ENCENDIDO y la FOTO
 const int DURACION_PULSO = 250;  // Setear en 500 ms
 
+//IR
+const int RECV_PIN = 10;
+IRrecv irrecv(RECV_PIN);
+decode_results results;
+unsigned long ultimoValorRecibidoIr = 0x000000;
+boolean recibioSenialIr = false;
+
 
 //------------------------------
 int intervaloFotosEnMinutos = 15;
@@ -33,28 +42,38 @@ volatile boolean esMomentoDeSacarFoto = false;
 
 ///////////////////////// SET UP ////////////////////////////
 void setup() {
-        Serial.begin(9600);
- 
-        setupTimers();       
-
-        setupTinyRtc();
-
-	pinMode(LEDPIN, OUTPUT); // led de prueba  
+    Serial.begin(9600);
+    
+    setupTimers();       
+    
+    setupIr();
+    
+    setupTinyRtc();
+    
+    pinMode(LEDPIN, OUTPUT); // led de prueba  
 }
 /////////////////////// FIN SET UP /////////////////////////
 
 ///////////////////// LOOP PRINCIPAL ///////////////////////
 void loop()
 {
-  if (esMomentoDeSacarFoto == true) {
+  if (recibioSenialIr) {
+    Serial.print("Senial IR recibida: ");
+    Serial.println(ultimoValorRecibidoIr, HEX);
+    procesarSenialIr();
+    recibioSenialIr = false;
+  }
+  
+  if (esMomentoDeSacarFoto) {
     sacarFoto();
     // ahora seteamos en false ya que acabamos de sacar foto y no tenemos que sacar otra hasta el proximo intervalo
     esMomentoDeSacarFoto = false;
-  } 
+  }
+
 }
 /////////////////// FIN LOOP PRINCIPAL ////////////////////
 
-
+//-------------------------------------------
 /** 
   * Interrupcion invocada por cada segundo.
   * Lleva la cuenta de la cantidad de segundos que pasaron desde la ultima foto que se saco.  Si es momento de sacar una nueva foto, 
@@ -70,6 +89,40 @@ ISR(TIMER1_COMPA_vect) {
     }  
 }
 //-------------------------------------------
+void CHECK_IR(){
+  while (irrecv.decode(&results)) {
+    recibioSenialIr = true;
+    // si el valor no es 'REPEAT'
+    if (results.value != 0xFFFFFFFF) {
+        imprimirValorIR();
+        ultimoValorRecibidoIr = results.value;
+    }
+    irrecv.resume();
+  }
+}
+//-------------------------------------------
+//-------------------------------------------
+void imprimirValorIR() {
+  
+  switch (results.decode_type) {
+    case SONY: Serial.print("SONY: "); break;
+    case NEC: Serial.print("NEC: "); break;
+    case RC5: Serial.print("RC5: "); break;
+    case RC6: Serial.print("RC6: "); break;
+    case UNKNOWN: Serial.print("UNKNOWN: "); break;
+  }
+  
+  switch (results.value) {
+    case 0x849: Serial.println("Remoto SONY CD Player (Boton REPEAT)"); break;
+    case 0x4017: Serial.println("Remoto SONY CD Player (Boton FADER)");    break;
+    case 0x4294967295: Serial.println("Remoto SONY CD Player (Boton FADER)");    break;
+    case 0x1233: Serial.println("Remoto SONY CD Player (Boton PLAY)");   break;
+    case 0xFFFFFFFF: Serial.println("REPEAT"); break;  
+
+    default: 
+      Serial.println("Otro boton");
+  }
+}
 //-------------------------------------------
 /* 
 * Determina si debe sacar la foto en base a la cantidad de segundos pasados desde la ultima foto y 
@@ -121,28 +174,73 @@ void imprimirTiempo() {
     Serial.println(tiempo);
 }
 //-------------------------------------------
+void procesarSenialIr() {
+   if (results.decode_type == NEC) {
+      Serial.print("NEC: ");
+    } else if (results.decode_type == SONY) {
+      Serial.print("SONY: ");
+    } else if (results.decode_type == RC5) {
+      Serial.print("RC5: ");
+    } else if (results.decode_type == RC6) {
+      Serial.print("RC6: ");
+    } else if (results.decode_type == UNKNOWN) {
+      Serial.print("UNKNOWN: ");
+    }
+    Serial.println(results.value);
+    irrecv.resume(); // Receive the next value
+
+  
+    if (results.value == 849) { //Remoto SONY CD Player (Boton REPEAT)
+      Serial.println("REMOTO PRENDER_ON");  
+          digitalWrite (PRENDER , LOW); // Prende la camara 
+    }
+  
+    if (results.value == 4017) { //Remoto SONY CD Player (Boton FADER)
+      Serial.println("REMOTO PRENDER_OFF");  
+          digitalWrite (PRENDER , HIGH); // Apaga la camara 
+    }
+  
+  
+    if (results.value == 4294967295) { //Remoto SONY CD Player (Boton FADER)
+      Serial.println("REMOTO PRENDER_OFF");  
+          digitalWrite (PRENDER , HIGH); // Apaga la camara 
+    }
+  
+    if (results.value == 1233) { //Remoto SONY CD Player (Boton PLAY)
+    Serial.println("Sacar Foto Con REMOTO");  
+    digitalWrite (FOTO , LOW); // Sacar FOTO 
+    delay (DURACION_PULSO);  
+    digitalWrite (FOTO, HIGH); // Libera Sacar FOTO
+    delay(1000);
+    } else {
+      digitalWrite (FOTO, HIGH); // Libera Sacar FOTO
+   }
+ 
+}
 //-------------------------------------------
 // FUNCIONES DE SET UP
 //-------------------------------------------
 
-// ---------- Setup de los Timers. NO CAMBIAR -------------
+/* 
+* Setea timers para interrumpir cada un segundo.  La funcion que se llamara por cada interrupcion sera ISR(TIMER1_COMPA_vect).
+*/
 void setupTimers() {
-	// initialize Timer1
-	cli();			// disable global interrupts
-	TCCR1A = 0;		// set entire TCCR1A register to 0
-	TCCR1B = 0;		// same for TCCR1B
+  // initialize Timer1
+  cli();      // disable global interrupts
+  TCCR1A = 0;   // set entire TCCR1A register to 0
+  TCCR1B = 0;   // same for TCCR1B
 
-	// set compare match register to desired timer count:
-	OCR1A = 15624;
-	// turn on CTC mode:
-	TCCR1B |= (1 << WGM12);
-	// Set CS10 and CS12 bits for 1024 prescaler:
-	TCCR1B |= (1 << CS10);
-	TCCR1B |= (1 << CS12);
-	// enable timer compare interrupt:
-	TIMSK1 |= (1 << OCIE1A);
-	// enable global interrupts:
-	sei();  
+  // set compare match register to desired timer count:
+  OCR1A = 15624;
+  // turn on CTC mode:
+  TCCR1B |= (1 << WGM12);
+  // Set CS10 and CS12 bits for 1024 prescaler:
+  TCCR1B |= (1 << CS10);
+  TCCR1B |= (1 << CS12);
+  // enable timer compare interrupt:
+  TIMSK1 |= (1 << OCIE1A);
+  // enable global interrupts:
+  sei();  
 }  
 //-------------------------------------------
 // -------------Set up RTC ------------------
@@ -200,5 +298,10 @@ void setupTinyRtc() {
         Serial.println("Tiempo Actual");
        
         uint8_t MESZ;          
+}
+//-------------------------------------------
+void setupIr() {
+       attachInterrupt(0,CHECK_IR,CHANGE);
+       irrecv.enableIRIn(); // Start the receiver
 }
 //-------------------------------------------
