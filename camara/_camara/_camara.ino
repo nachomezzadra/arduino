@@ -73,6 +73,9 @@ void loop()
 }
 /////////////////// FIN LOOP PRINCIPAL ////////////////////
 
+
+/////////////////// INTERRUPCIONES ///////////////////////
+
 //-------------------------------------------
 /** 
   * Interrupcion invocada por cada segundo.
@@ -100,6 +103,8 @@ void CHECK_IR(){
     irrecv.resume();
   }
 }
+
+/////////////////// FIN INTERRUPCIONES ////////////////////
 //-------------------------------------------
 //-------------------------------------------
 void imprimirValorIR() {
@@ -139,16 +144,19 @@ boolean debeSacarFoto(int segundosPasadosDesdeUltimaFoto) {
 }
 //-------------------------------------------
 void sacarFoto() {
-//   digitalWrite(LEDPIN, !digitalRead(LEDPIN)); 
   imprimirTiempo();
   
   prenderCamara();
-  digitalWrite (FOTO , LOW);
-  delay (DURACION_PULSO);
-  digitalWrite (FOTO , HIGH);   
+  disparar();
   ponerEnStandByCamara();
   
   Serial.println("Foto tomada");
+}
+//-------------------------------------------
+void disparar() {
+  digitalWrite (FOTO , LOW);
+  delay (DURACION_PULSO);
+  digitalWrite (FOTO , HIGH);   
 }
 //-------------------------------------------
 void prenderCamara() {
@@ -207,11 +215,8 @@ void procesarSenialIr() {
     }
   
     if (results.value == 1233) { //Remoto SONY CD Player (Boton PLAY)
-    Serial.println("Sacar Foto Con REMOTO");  
-    digitalWrite (FOTO , LOW); // Sacar FOTO 
-    delay (DURACION_PULSO);  
-    digitalWrite (FOTO, HIGH); // Libera Sacar FOTO
-    delay(1000);
+      Serial.println("Sacar Foto Con REMOTO");  
+      disparar();
     } else {
       digitalWrite (FOTO, HIGH); // Libera Sacar FOTO
    }
